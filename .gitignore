@@ -3,6 +3,7 @@ results/
 xaiserver/xairesult
 dataprocess/datasets
 temp/
+venv/
 .env
 datasets/
 xairesult
@@ -15,3 +16,4 @@ __pycache__/
 *.jpeg
 *.gif
 xaiserver/e2e-process
+venv

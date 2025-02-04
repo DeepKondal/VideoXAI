@@ -12,9 +12,14 @@ import os
 import asyncio
 import logging
 
+from neo4j_client import ProvenanceModel
+import datetime
+
+
 
 app = FastAPI(title="Coordination Center")
-
+#Provenance_logic
+provenance = ProvenanceModel()
 
 async def async_http_post(url, json_data=None, files=None):
     async with httpx.AsyncClient(timeout=120.0) as client:  # Timeout set to 60 seconds
@@ -85,14 +90,38 @@ async def process_perturbation_config(perturbation_config):
         await async_http_post(full_url)
 
 
-# 处理模型配置
-async def process_model_config(model_config):
+async def process_model_config(model_config, run_id):
     base_url = model_config['base_url']
+    dataset_id = "kinetics_400"  # Ensure this dataset ID is used correctly
+    
     for model, settings in model_config['models'].items():
-        # full_url = f"{base_url}/{settings['model_name']}/{model}/{settings['perturbation_type']}/{settings['severity']}"
         full_url = f"{base_url}/{settings['model_name']}/{model}"
         print(f"Calling model server: {full_url}")
-        await async_http_post(full_url)
+        
+        try:
+            response = await async_http_post(full_url)
+
+            # Store results in Neo4j
+            for result in response.get("results", []):
+                video_file = result.get("video_file", "Unknown")
+                prediction = result.get("prediction", "Unknown")
+
+                # 🔄 Save Prediction Node
+                provenance.create_model_prediction(video_file, prediction)
+
+                # 🔄 Link Model Processing Step to Prediction
+                provenance.link_processing_to_prediction("Model Processing", video_file)
+
+                # 🔄 Link Dataset to Prediction (NEW FIX)
+                provenance.link_dataset_to_prediction(dataset_id, video_file)
+
+                # 🔄 NEW: Link Prediction to PipelineRun
+                provenance.link_pipeline_to_prediction(run_id, video_file)
+
+        except Exception as e:
+            print(f"❌ Error in model processing: {e}")
+
+
 
 
 # 处理 XAI 配置
@@ -148,30 +177,83 @@ async def process_pipeline_step(config, step_key, process_function):
     if step_key in config:
         await process_function(config[step_key])
 
-# 从配置运行整个 Pipeline
+
+
 async def run_pipeline_from_config(config):
-    await process_pipeline_step(config, 'upload_config', process_upload_config)
-    await process_pipeline_step(config, 'perturbation_config', process_perturbation_config)
-    await process_pipeline_step(config, 'model_config', process_model_config)
-    await process_pipeline_step(config, 'xai_config', process_xai_config)
-    # await process_pipeline_step(config, 'evaluation_config', process_evaluation_config)
+    run_id = f"run_{datetime.datetime.now().isoformat()}"
+
+    try:
+        provenance.create_pipeline_run(run_id, datetime.datetime.now().isoformat(), "Running")
+        dataset_id = "kinetics_400"
+        provenance.create_dataset(dataset_id, "Kinetics-400", "dataprocess/videos/")
+    except Exception as e:
+        logging.error(f"❌ Failed to create provenance records: {e}")
+
+    try:
+        await process_pipeline_step(config, 'upload_config', process_upload_config)
+        provenance.create_processing_step("Upload Data", "upload", str(config["upload_config"]))
+        provenance.link_pipeline_step(run_id, "Upload Data")
+        provenance.link_dataset_to_processing(dataset_id, "Upload Data")  # 🆕 Link dataset to processing
+
+    except Exception as e:
+        logging.error(f"❌ Upload processing failed: {e}")
+
+    try:
+        await process_pipeline_step(config, 'perturbation_config', process_perturbation_config)
+        provenance.create_processing_step("Apply Perturbation", "perturbation", str(config["perturbation_config"]))
+        provenance.link_pipeline_step(run_id, "Apply Perturbation")
+    except Exception as e:
+        logging.error(f"❌ Perturbation processing failed: {e}")
+
+    try:
+        await process_pipeline_step(config, 'model_config', lambda cfg: process_model_config(cfg, run_id))
+        provenance.create_processing_step("Model Processing", "model", str(config["model_config"]))
+        provenance.link_pipeline_step(run_id, "Model Processing")
+    except Exception as e:
+        logging.error(f"❌ Model processing failed: {e}")
+
+    try:
+        await process_pipeline_step(config, 'xai_config', process_xai_config)
+        provenance.create_processing_step("XAI Analysis", "XAI", str(config["xai_config"]))
+        provenance.link_pipeline_step(run_id, "XAI Analysis")
+    except Exception as e:
+        logging.error(f"❌ XAI processing failed: {e}")
+
+    try:
+        provenance.create_pipeline_run(run_id, datetime.datetime.now().isoformat(), "Completed")
+    except Exception as e:
+        logging.error(f"❌ Failed to mark pipeline as completed in provenance: {e}")
+
+    print(f"✅ Pipeline {run_id} execution completed.")
+
 import traceback  
-# API 端点来触发 Pipeline
+pipeline_status = {}
+
 @app.post("/run_pipeline/")
 async def run_pipeline(request: Request):
-    config = await request.json()  # 直接从请求中读取 JSON 配置
+    config = await request.json()
+    run_id = f"run_{datetime.datetime.now().isoformat()}"
+    pipeline_status[run_id] = "Running"
+
     try:
         await run_pipeline_from_config(config)
-        return {"message": "Pipeline executed successfully"}
+        pipeline_status[run_id] = "Completed"
+        return {"message": f"Pipeline {run_id} executed successfully"}
     except Exception as e:
-        error_details = traceback.format_exc()   # get detailed error message
-        print(f"Error encountered in pipeline:\n{error_details}")
-        raise HTTPException(status_code=500, detail=str(e))
+        pipeline_status[run_id] = f"Failed: {str(e)}"
+        return HTTPException(status_code=500, detail=str(e))
+
+@app.get("/pipeline_status/{run_id}")
+async def get_pipeline_status(run_id: str):
+    status = pipeline_status.get(run_id, "Not Found")
+    return {"run_id": run_id, "status": status}
 
 # 加载配置文件
 def load_config():
     with open("config.json", "r") as file:
         return json.load(file)
+    
+
 
 if __name__ == "__main__":
     import uvicorn

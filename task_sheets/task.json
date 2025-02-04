@@ -1,41 +1,37 @@
 {
   "upload_config": {
-    "server_url": "http://0.0.0.0:8001",
+    "server_url": "http://127.0.0.1:8001",
     "datasets": {
       "kinetics_400": {
         "local_video_dir": "dataprocess/videos"
       }
     }
   },
-"perturbation_config": {
-  "server_url": "http://0.0.0.0:8001",
-  "datasets": {
-    "kinetics_400": {
-      "perturbation_type": "none",
-      "severity": 0
-    }
-  }
-},
-
-  "model_config": {
-    "base_url": "http://0.0.0.0:8002",
-    "models": {
-      "kinetics_video": {
-        "model_name": "facebook/timesformer-base-finetuned-k400",
-        "video_path": "dataprocess/videos",
-        "num_frames": 8
+  "perturbation_config": {
+    "server_url": "http://127.0.0.1:8001",
+    "datasets": {
+      "kinetics_400": {
+        "perturbation_type": "none",
+        "severity": 0
       }
     }
   },
-
+  "model_config": {
+    "base_url": "http://127.0.0.1:8002",
+    "models": {
+      "kinetics_video": {
+        "model_name": "facebook/timesformer-base-finetuned-k400",
+        "dataset_id": "kinetics_400"
+      }
+    }
+  },
   "xai_config": {
-  "base_url": "http://0.0.0.0:8003",
-  "datasets": {
-    "kinetics_video": {
-      "video_path": "dataprocess/videos/",
+    "base_url": "http://127.0.0.1:8003",
+    "datasets": {
+      "kinetics_video": {
+        "video_path": "dataprocess/videos/",
         "num_frames": 8
+      }
     }
   }
-}
-
 }

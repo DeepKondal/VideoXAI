@@ -110,29 +110,39 @@ async def apply_perturbation(background_tasks: BackgroundTasks, dataset_id: str,
     return {"message": "Perturbation process started."}
 
 # Load Kinetics-400 metadata
+import traceback
+
 @app.post("/process-kinetics-dataset")
 async def process_kinetics_dataset(data: dict):
-    """
-    Process a directory of Kinetics-400 videos.
-    """
-    video_dir = data.get("video_dir")
-    num_frames = data.get("num_frames", 8)
-
-    if not video_dir or not os.path.exists(video_dir):
-        raise HTTPException(status_code=400, detail="Invalid or missing 'video_dir'")
-
     try:
+        video_dir = data.get("video_dir")
+        num_frames = data.get("num_frames", 8)
+
+        if not video_dir or not os.path.exists(video_dir):
+            raise HTTPException(status_code=400, detail=f"Invalid or missing 'video_dir': {video_dir}")
+
         results = []
         for video_file in os.listdir(video_dir):
             if video_file.endswith(".mp4"):
                 video_path = os.path.join(video_dir, video_file)
-                # Process the video using metadata loaded in DataProcess
-                result = data_processor.process_kinetics_video(video_path, num_frames=num_frames)
-                results.append(result)
+                print(f"Processing video: {video_path}")  # Debugging
+
+                # Wrap processing in try-except to capture full traceback
+                try:
+                    result = data_processor.process_kinetics_video(video_path, num_frames=num_frames)
+                    results.append(result)
+                except Exception as e:
+                    error_message = traceback.format_exc()
+                    print(f"❌ ERROR processing {video_path}: {error_message}")
+                    raise HTTPException(status_code=500, detail=error_message)
 
         return {"message": "Kinetics-400 dataset processed successfully", "results": results}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_message = traceback.format_exc()
+        print(f"❌ ERROR in process_kinetics_dataset: {error_message}")
+        raise HTTPException(status_code=500, detail=error_message)
+
 
 
 if __name__ == "__main__":

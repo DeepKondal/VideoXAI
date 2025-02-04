@@ -1,0 +1,14 @@
+Invoke-RestMethod -Uri "http://127.0.0.1:8880/run_pipeline/" `
+    -Method Post `
+    -Headers @{"Content-Type"="application/json"} `
+    -Body (Get-Content "task_sheets/task.json" -Raw)
+
+
+#checkPipeline
+Invoke-RestMethod -Uri "http://127.0.0.1:8880/pipeline_status/run_2025-02-04T10:30:00" -Method Get
+
+
+
+
+#checkDatabase
+MATCH (p:ModelPrediction) RETURN p;

@@ -108,4 +108,15 @@ class ProvenanceModel:
                 """,
                 dataset_id=dataset_id, video_file=video_file
             )
+    '''
+    def create_adversarial_prediction(self, video_file, prediction):
+        with self.driver.session() as session:
+            session.run(
+                """
+                MERGE (m:AdversarialPrediction {video_file: $video_file})
+                SET m.prediction = $prediction, m.name = "Adversarial Prediction"
+                """,
+                video_file=video_file, prediction=prediction
+            )
+    '''
 

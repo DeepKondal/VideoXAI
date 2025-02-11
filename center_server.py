@@ -11,7 +11,8 @@ import json
 import os
 import asyncio
 import logging
-
+from adversarial.adversarial_model import evaluate_adversarial
+import random
 from neo4j_client import ProvenanceModel
 import datetime
 
@@ -20,6 +21,10 @@ import datetime
 app = FastAPI(title="Coordination Center")
 #Provenance_logic
 provenance = ProvenanceModel()
+
+
+# Traffic Counters
+traffic_count = {"8002": 0, "8005": 0}
 
 async def async_http_post(url, json_data=None, files=None):
     async with httpx.AsyncClient(timeout=120.0) as client:  # Timeout set to 60 seconds
@@ -89,75 +94,93 @@ async def process_perturbation_config(perturbation_config):
         full_url = f"{url}/apply-perturbation/{dataset}/{settings['perturbation_type']}/{settings['severity']}"
         await async_http_post(full_url)
 
-
 async def process_model_config(model_config, run_id):
-    base_url = model_config['base_url']
-    dataset_id = "kinetics_400"  # Ensure this dataset ID is used correctly
-    
-    for model, settings in model_config['models'].items():
-        full_url = f"{base_url}/{settings['model_name']}/{model}"
-        print(f"Calling model server: {full_url}")
-        
-        try:
-            response = await async_http_post(full_url)
+    base_urls = model_config['base_urls']  # Dynamically pick from config
+    dataset_id = "kinetics_400"
+    load_split = model_config["load_split"]  # P value (percentage of requests to go to new model)
 
-            # Store results in Neo4j
+    video_dir = "dataprocess/videos"
+    video_files = sorted([f for f in os.listdir(video_dir) if f.endswith(".mp4")])  # Ensure consistent order
+
+    # 🟢 Dynamically ensure 8002 is first and 8005 is second
+    old_model_server, new_model_server = sorted(base_urls, key=lambda url: url.split(":")[-1])
+
+    # 🟢 Assign videos based on P (Strangler Pattern)
+    total_videos = len(video_files)
+    num_to_old_model = int((load_split / 100) * total_videos)  # Videos going to old model (8002)
+    num_to_new_model = total_videos - num_to_old_model  # Videos staying in new model (8005)
+
+    videos_for_old_model = video_files[:num_to_old_model]  # First P% go to old model
+    videos_for_new_model = video_files[num_to_old_model:]  # Remaining go to new model
+
+    for video_file in video_files:
+        try:
+            # 🟢 Dynamically assign based on video list
+            chosen_server = old_model_server if video_file in videos_for_old_model else new_model_server
+            full_url = f"{chosen_server}/{model_config['models']['kinetics_video']['model_name']}/kinetics_video"
+
+            # 🟢 Update traffic count safely
+            server_port = chosen_server.split(":")[-1]
+            traffic_count.setdefault(server_port, 0)
+            traffic_count[server_port] += 1
+
+            print(f"📡 Routing {video_file} to: {full_url} "
+                  f"(Total requests - {old_model_server}: {traffic_count[old_model_server.split(':')[-1]]}, "
+                  f"{new_model_server}: {traffic_count[new_model_server.split(':')[-1]]})")
+
+            # Send request per video
+            response = await async_http_post(full_url, json_data={"video_path": os.path.join(video_dir, video_file)})
+
+            # Process response
             for result in response.get("results", []):
-                video_file = result.get("video_file", "Unknown")
+                video_filename = result.get("video_file", "Unknown")
                 prediction = result.get("prediction", "Unknown")
 
-                # 🔄 Save Prediction Node
-                provenance.create_model_prediction(video_file, prediction)
+                # Save predictions
+                provenance.create_model_prediction(video_filename, prediction)
+                provenance.link_processing_to_prediction("Model Processing", video_filename)
+                provenance.link_dataset_to_prediction(dataset_id, video_filename)
+                provenance.link_pipeline_to_prediction(run_id, video_filename)
 
-                # 🔄 Link Model Processing Step to Prediction
-                provenance.link_processing_to_prediction("Model Processing", video_file)
-
-                # 🔄 Link Dataset to Prediction (NEW FIX)
-                provenance.link_dataset_to_prediction(dataset_id, video_file)
-
-                # 🔄 NEW: Link Prediction to PipelineRun
-                provenance.link_pipeline_to_prediction(run_id, video_file)
+                print(f"✅ Prediction for {video_filename}: {prediction}")
 
         except Exception as e:
-            print(f"❌ Error in model processing: {e}")
+            print(f"❌ Error processing {video_file}: {e}")  # Ensure next video gets processed
 
 
 
-
-# 处理 XAI 配置
 async def process_xai_config(xai_config):
-    base_url = xai_config['base_url']
-    # for dataset, settings in xai_config['datasets'].items():
-        # dataset_id = settings.get('dataset_id', '')  # 提取 "dataset_id"
-        # algorithms = settings.get('algorithms', [])  # 提取 "algorithms"
-        # data = {
-        #     "dataset_id": dataset_id,
-        #     "algorithms": algorithms
-        # }
-        # print(data)
-        # full_url = f"{base_url}/cam_xai/"
-        # print(full_url)
-        # await async_http_post(full_url, json_data=data)
-    
+    xai_server = xai_config['base_url']  # XAI service at port 8003
+
     for dataset, settings in xai_config['datasets'].items():
         video_dir = settings.get('video_path', '')
         num_frames = settings.get('num_frames', 8)
-        
-        if os.path.isdir(video_dir):
-            video_files = [os.path.join(video_dir, f) for f in os.listdir(video_dir) if f.endswith(".mp4")]
-            for video_file in video_files:
+
+        if not os.path.isdir(video_dir):
+            print(f"⚠ Video path {video_dir} is not a directory. Skipping XAI processing.")
+            continue
+
+        video_files = [os.path.abspath(os.path.join(video_dir, f)) for f in os.listdir(video_dir) if f.endswith(".mp4")]
+
+        if not video_files:
+            print(f"⚠ No video files found in {video_dir}. Skipping XAI processing.")
+            continue
+
+        for video_file in video_files:
+            try:
                 data = {
                     "video_path": video_file,
                     "num_frames": num_frames
                 }
-                full_url = f"{base_url}/staa-video-explain/"
-                try:
-                    response = await async_http_post(full_url, json_data=data)
-                    print(f"XAI response for video {video_file}: {response}")
-                except Exception as e:
-                    print(f"Error processing XAI for video {video_file}: {e}")
-        else:
-            print(f"Video path {video_dir} is not a directory.")
+
+                print(f"📡 Sending XAI request to {xai_server} for {video_file}")
+                xai_full_url = f"{xai_server}/staa-video-explain/"
+                xai_response = await async_http_post(xai_full_url, json_data=data)
+                print(f"✅ XAI response for {video_file}: {xai_response}")
+
+            except Exception as e:
+                print(f"❌ Error processing XAI from {xai_server} for video {video_file}: {e}")
+
 # 处理评估配置
 async def process_evaluation_config(evaluation_config):
     base_url = evaluation_config['base_url']
@@ -238,6 +261,8 @@ async def run_pipeline(request: Request):
     try:
         await run_pipeline_from_config(config)
         pipeline_status[run_id] = "Completed"
+        # Print final traffic distribution
+        print(f"📊 Final Traffic Stats: Model Server (8002) → {traffic_count['8002']} requests, New Model Server (8005) → {traffic_count['8005']} requests")
         return {"message": f"Pipeline {run_id} executed successfully"}
     except Exception as e:
         pipeline_status[run_id] = f"Failed: {str(e)}"

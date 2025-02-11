@@ -17,13 +17,17 @@
     }
   },
   "model_config": {
-    "base_url": "http://127.0.0.1:8002",
+    "base_urls": [
+      "http://127.0.0.1:8002",
+      "http://127.0.0.1:8005"
+    ],
     "models": {
       "kinetics_video": {
         "model_name": "facebook/timesformer-base-finetuned-k400",
         "dataset_id": "kinetics_400"
       }
-    }
+    },
+    "load_split": 100
   },
   "xai_config": {
     "base_url": "http://127.0.0.1:8003",

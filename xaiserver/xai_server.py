@@ -7,6 +7,8 @@ import aiohttp
 import os
 from attention_extractor import AttentionExtractor  
 import torch 
+from matplotlib import pyplot as plt
+import json
 app = FastAPI()
 staa_model = AttentionExtractor("facebook/timesformer-base-finetuned-k400", device="cpu")
 class XAIRequest(BaseModel):
@@ -78,34 +80,21 @@ async def staa_video_explain(request: VideoExplainRequest):
     try:
         video_path = request.video_path
         num_frames = request.num_frames
-
-        print(f"🟢 Received XAI request: Video={video_path}, Frames={num_frames}")
-
-        # Check if file exists
-        if not os.path.exists(video_path):
-            print(f"❌ ERROR: Video file not found: {video_path}")
-            raise HTTPException(status_code=400, detail=f"Video file not found: {video_path}")
-
-        # Run XAI processing
         spatial_attention, temporal_attention, frames, logits = staa_model.extract_attention(video_path, num_frames)
         prediction_idx = torch.argmax(logits, dim=1).item()
         prediction = staa_model.model.config.id2label[prediction_idx]
-
-        print(f"✅ XAI Processing Successful: {prediction}")
 
         return {
             "prediction": prediction,
             "spatial_attention": spatial_attention.tolist(),
             "temporal_attention": temporal_attention.tolist(),
         }
-
     except Exception as e:
-        error_message = traceback.format_exc()  # Get full error traceback
-        print(f"🚨 XAI Processing Failed: {error_message}")
-        raise HTTPException(status_code=500, detail=f"Error processing video: {error_message}")
+        logging.error(f"Error in staa_video_explain: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
 
 
-
+       
 
 if __name__ == "__main__":
     import uvicorn

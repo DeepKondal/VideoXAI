@@ -11,6 +11,7 @@ from fastapi import BackgroundTasks
 import pandas as pd
 import av
 import numpy as np
+from adversarial import evaluate_and_generate_adversarial
 app = FastAPI()
 
 data_processor = DataProcess(base_storage_address="datasets")
@@ -95,19 +96,48 @@ async def download_dataset(dataset_id: str, download_path: str):
     return {"message": "Dataset downloaded successfully"}
 
 
+# @app.post("/apply-perturbation/{dataset_id}/{perturbation_func_name}/{severity}")
+# async def apply_perturbation(background_tasks: BackgroundTasks, dataset_id: str, perturbation_func_name: str, severity: int):
+#     # 确认扰动函数存在于 DataProcess 类中且可调用
+#     if not hasattr(DataProcess.DataProcess, perturbation_func_name) or not callable(getattr(DataProcess.DataProcess, perturbation_func_name)):
+#         raise HTTPException(status_code=400, detail="Unsupported or invalid perturbation function.")
+
+#     # 获取对应的扰动函数
+#     perturbation_func = getattr(DataProcess.DataProcess, perturbation_func_name)
+
+#     # 异步执行扰动应用
+#     background_tasks.add_task(data_processor.apply_image_perturbation, dataset_id, perturbation_func, severity)
+
+#     return {"message": "Perturbation process started."}
+
 @app.post("/apply-perturbation/{dataset_id}/{perturbation_func_name}/{severity}")
 async def apply_perturbation(background_tasks: BackgroundTasks, dataset_id: str, perturbation_func_name: str, severity: int):
-    # 确认扰动函数存在于 DataProcess 类中且可调用
-    if not hasattr(DataProcess.DataProcess, perturbation_func_name) or not callable(getattr(DataProcess.DataProcess, perturbation_func_name)):
-        raise HTTPException(status_code=400, detail="Unsupported or invalid perturbation function.")
+    """
+    Apply perturbation or adversarial attack on videos within the specified dataset.
+    If 'adversarial_attack' is chosen, the FGSM-based attack will be applied.
+    """
+    dataset_path = "dataprocess/videos"
 
-    # 获取对应的扰动函数
-    perturbation_func = getattr(DataProcess.DataProcess, perturbation_func_name)
+    if perturbation_func_name == "adversarial_attack":
+        # Apply adversarial attack using the provided FGSM implementation
+        config = {
+            'model_name': 'facebook/timesformer-base-finetuned-k400',
+            'video_directory': dataset_path,  # Input directory
+            'label_file': 'dataprocess/kinetics400_val_list_videos.txt',
+            'epsilon': severity / 10.0  # Map severity to epsilon value (0.1, 0.2, etc.)
+        }
 
-    # 异步执行扰动应用
-    background_tasks.add_task(data_processor.apply_image_perturbation, dataset_id, perturbation_func, severity)
+        background_tasks.add_task(evaluate_and_generate_adversarial, config)
+        return {"message": "Adversarial attack process started."}
+    else:
+        # Apply general image perturbations using DataProcess class
+        if not hasattr(DataProcess, perturbation_func_name) or not callable(getattr(DataProcess, perturbation_func_name)):
+            raise HTTPException(status_code=400, detail="Unsupported or invalid perturbation function.")
 
-    return {"message": "Perturbation process started."}
+        perturbation_func = getattr(DataProcess, perturbation_func_name)
+        background_tasks.add_task(data_processor.apply_image_perturbation, dataset_id, perturbation_func, severity)
+
+        return {"message": "Perturbation process started."}
 
 # Load Kinetics-400 metadata
 import traceback

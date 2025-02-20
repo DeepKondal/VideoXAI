@@ -1,0 +1,5 @@
+{
+    "video_name": "__U_scuxNlQ",
+    "prediction": "playing violin",
+    "spatial_attention_json": "xai_results/adversarial/__U_scuxNlQ_adversarial_attention.json"
+}

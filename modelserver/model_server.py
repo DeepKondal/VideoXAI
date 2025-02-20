@@ -1,15 +1,20 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException ,File
 
+from fastapi import FastAPI, BackgroundTasks, HTTPException ,File
 from pydantic import BaseModel
 import Model_ResNet
 import os
 import torch
-from attention_extractor import AttentionExtractor  
+from attention_extractor import AttentionExtractor as TimesformerAttentionExtractor
 from fastapi import UploadFile
+from generateTemporalSpatial import process_video, create_sample_frames_visualization
+from generateTemporalSpatial import AttentionExtractor as TemporalSpatialAttentionExtractor
 
 app = FastAPI()
 # Initialize STAA
-attention_extractor = AttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400", device="cuda" if torch.cuda.is_available() else "cpu")
+attention_extractor = TimesformerAttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400", device="cuda" if torch.cuda.is_available() else "cpu")
+
+# Extractor for Temporal-Spatial XAI (generateTemporalSpatial)
+temporal_spatial_extractor = TemporalSpatialAttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400",device="cuda" if torch.cuda.is_available() else "cpu")
 # Output directory
 OUTPUT_DIR = "video_results"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -40,77 +45,117 @@ async def run_model1_background(dataset_id: str, perturbation_func_name: str, se
     }
 
 
-# video explanation
-extractor = AttentionExtractor(
+
+# Define directories
+CLEAN_VIDEO_DIR = "dataprocess/videos"
+OUTPUT_DIR = "output"
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(os.path.join(OUTPUT_DIR, "clean"), exist_ok=True)
+
+
+# Initialize extractors
+timesformer_extractor = TimesformerAttentionExtractor(
     model_name="facebook/timesformer-base-finetuned-k400",
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device="cuda" if torch.cuda.is_available() else "cpu"
+)
+
+temporal_spatial_extractor = TemporalSpatialAttentionExtractor(
+    model_name="facebook/timesformer-base-finetuned-k400",
+    device="cuda" if torch.cuda.is_available() else "cpu"
 )
 
 
-OUTPUT_DIR = "video_results"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-
-@app.post("/facebook/timesformer-base-finetuned-k400/{dataset_id}")
-async def video_explain(dataset_id: str):
-
-# async def video_explain(video: UploadFile = File(...)):
-    # try:
-    #     # Save uploaded video to a temporary file
-    #     video_path = os.path.join(TEMP_DIR, video.filename)
-    #     with open(video_path, "wb") as f:
-    #         f.write(await video.read())
-    #     spatial_attention, temporal_attention, frames, logits = extractor.extract_attention(video_path)
-    #     prediction_idx = torch.argmax(logits, dim=1).item()
-    #     prediction = extractor.model.config.id2label[prediction_idx]
-
-    #     # Save visualization results
-    #     save_path = os.path.join(OUTPUT_DIR, os.path.splitext(video.filename)[0])
-    #     os.makedirs(save_path, exist_ok=True)
-    #     extractor.visualize_attention(
-    #         spatial_attention, temporal_attention, frames, save_path, prediction, "Unknown"
-    #     )
-    #     os.remove(video_path)
-
-    #     return {
-    #         "message": "Video processed successfully.",
-    #         "prediction": prediction,
-    #         "results_dir": save_path,
-    #     }
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
-
-    video_dir = "dataprocess/videos"
-    video_files = [f for f in os.listdir(video_dir) if f.endswith(".mp4")]
-
+@app.post("/facebook/timesformer-base-finetuned-k400/process-original-videos")
+async def process_timesformer_original_videos():
+    """
+    This endpoint processes only original (clean) videos using Facebook Timesformer.
+    """
     results = []
-    for video_file in video_files:
-        video_path = os.path.join(video_dir, video_file)
-        try:
-             # Extract attention and logits
-            spatial_attention, temporal_attention, frames, logits = extractor.extract_attention(video_path)
-            prediction_idx = torch.argmax(logits, dim=1).item()
-            prediction = extractor.model.config.id2label[prediction_idx]
 
-            # Create a unique directory for each video’s result
-            video_result_dir = os.path.join(OUTPUT_DIR, os.path.splitext(video_file)[0])
+    if not os.path.exists(CLEAN_VIDEO_DIR):
+        raise HTTPException(status_code=404, detail="Original video directory not found.")
+
+    video_files = [f for f in os.listdir(CLEAN_VIDEO_DIR) if f.endswith(".mp4")]
+    
+    if not video_files:
+        return {"message": "No original videos found in directory."}
+
+    for video_file in video_files:
+        video_path = os.path.join(CLEAN_VIDEO_DIR, video_file)
+
+        try:
+            # Extract attention & logits using Timesformer
+            spatial_attention, temporal_attention, frames, logits = timesformer_extractor.extract_attention(video_path)
+            prediction_idx = torch.argmax(logits, dim=1).item()
+            prediction = timesformer_extractor.model.config.id2label[prediction_idx]
+
+            # Save results
+            video_result_dir = os.path.join(OUTPUT_DIR, "clean", os.path.splitext(video_file)[0])
             os.makedirs(video_result_dir, exist_ok=True)
 
-            # Save visualizations
-            extractor.visualize_attention(
-                spatial_attention, temporal_attention, frames, video_result_dir, prediction, "Unknown"
+            # Save visualization
+            timesformer_extractor.visualize_attention(
+                spatial_attention, temporal_attention, frames, video_result_dir, prediction, "clean"
             )
-            
 
             results.append({
                 "video_file": video_file,
+                "video_type": "clean",
                 "prediction": prediction,
-                "results_dir": video_result_dir 
+                "results_dir": video_result_dir
             })
+
         except Exception as e:
-            results.append({"video_file": video_file, "error": str(e)})
+            results.append({
+                "video_file": video_file,
+                "video_type": "clean",
+                "error": str(e)
+            })
 
     return {"results": results}
+
+
+@app.post("/process-original-videos")
+async def process_and_visualize_original_videos():
+    """
+    This endpoint processes only original (clean) videos using Temporal-Spatial XAI.
+    """
+    try:
+        response = {"message": "Processing original videos", "clean_videos": []}
+
+        # Process Clean Videos
+        if os.path.exists(CLEAN_VIDEO_DIR):
+            clean_videos = [f for f in os.listdir(CLEAN_VIDEO_DIR) if f.endswith(".mp4")]
+            for video_name in clean_videos:
+                clean_video_path = os.path.join(CLEAN_VIDEO_DIR, video_name)
+                clean_output_dir = os.path.join(OUTPUT_DIR, "clean", video_name)
+                os.makedirs(clean_output_dir, exist_ok=True)
+
+                clean_predicted_label, clean_frames_dir, clean_json_path, clean_heatmap_video_path = process_video(
+                    clean_video_path, clean_output_dir, extractor=temporal_spatial_extractor
+                )
+
+                clean_visualization_path = create_sample_frames_visualization(
+                    video_name=os.path.splitext(video_name)[0],
+                    results_dir=clean_output_dir
+                )
+
+                response["clean_videos"].append({
+                    "video_name": video_name,
+                    "predicted_label": clean_predicted_label,
+                    "frames_directory": clean_frames_dir,
+                    "attention_json_path": clean_json_path,
+                    "heatmap_video_path": clean_heatmap_video_path,
+                    "visualization_path": clean_visualization_path
+                })
+
+        return response
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)

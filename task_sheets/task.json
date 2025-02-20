@@ -11,8 +11,9 @@
     "server_url": "http://127.0.0.1:8001",
     "datasets": {
       "kinetics_400": {
-        "perturbation_type": "none",
-        "severity": 0
+        "perturbation_type": "adversarial_attack",
+        "severity": 1,
+        "video_directory": "dataprocess/videos"
       }
     }
   },
@@ -24,10 +25,11 @@
     "models": {
       "kinetics_video": {
         "model_name": "facebook/timesformer-base-finetuned-k400",
-        "dataset_id": "kinetics_400"
+        "original_video_dir": "dataprocess/videos",
+        "adversarial_video_dir": "dataprocess/FGSM",
+        "num_frames": 8
       }
-    },
-    "load_split": 100
+    }
   },
   "xai_config": {
     "base_url": "http://127.0.0.1:8003",

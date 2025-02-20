@@ -1,18 +1,20 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException ,File
 
+from fastapi import FastAPI, BackgroundTasks, HTTPException ,File
 from pydantic import BaseModel
 import Model_ResNet
 import os
 import torch
-from attention_extractor import AttentionExtractor  
+from attention_extractor import AttentionExtractor as TimesformerAttentionExtractor
 from fastapi import UploadFile
+from generateTemporalSpatial import process_video, create_sample_frames_visualization
+from generateTemporalSpatial import AttentionExtractor as TemporalSpatialAttentionExtractor
 
 app = FastAPI()
 # Initialize STAA
-attention_extractor = AttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400", device="cuda" if torch.cuda.is_available() else "cpu")
-# Output directory
-OUTPUT_DIR = "video_results"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+attention_extractor = TimesformerAttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400", device="cuda" if torch.cuda.is_available() else "cpu")
+
+# Extractor for Temporal-Spatial XAI (generateTemporalSpatial)
+temporal_spatial_extractor = TemporalSpatialAttentionExtractor(model_name="facebook/timesformer-base-finetuned-k400",device="cuda" if torch.cuda.is_available() else "cpu")
 
 
 class DatasetPaths(BaseModel):
@@ -40,77 +42,90 @@ async def run_model1_background(dataset_id: str, perturbation_func_name: str, se
     }
 
 
-# video explanation
-extractor = AttentionExtractor(
-    model_name="facebook/timesformer-base-finetuned-k400",
-    device="cuda" if torch.cuda.is_available() else "cpu",
-)
-
-
-OUTPUT_DIR = "video_results"
+# Paths for adversarial videos
+ADVERSARIAL_VIDEO_DIR = "dataprocess/FGSM"
+OUTPUT_DIR = "output/adversarial"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+@app.post("/facebook/timesformer-base-finetuned-k400/process-adversarial-videos")
+async def process_adversarial_timesformer():
+    """Process adversarial videos using Facebook Timesformer"""
+    if not os.path.exists(ADVERSARIAL_VIDEO_DIR):
+        raise HTTPException(status_code=404, detail="Adversarial video directory not found")
 
-@app.post("/facebook/timesformer-base-finetuned-k400/{dataset_id}")
-async def video_explain(dataset_id: str):
-
-# async def video_explain(video: UploadFile = File(...)):
-    # try:
-    #     # Save uploaded video to a temporary file
-    #     video_path = os.path.join(TEMP_DIR, video.filename)
-    #     with open(video_path, "wb") as f:
-    #         f.write(await video.read())
-    #     spatial_attention, temporal_attention, frames, logits = extractor.extract_attention(video_path)
-    #     prediction_idx = torch.argmax(logits, dim=1).item()
-    #     prediction = extractor.model.config.id2label[prediction_idx]
-
-    #     # Save visualization results
-    #     save_path = os.path.join(OUTPUT_DIR, os.path.splitext(video.filename)[0])
-    #     os.makedirs(save_path, exist_ok=True)
-    #     extractor.visualize_attention(
-    #         spatial_attention, temporal_attention, frames, save_path, prediction, "Unknown"
-    #     )
-    #     os.remove(video_path)
-
-    #     return {
-    #         "message": "Video processed successfully.",
-    #         "prediction": prediction,
-    #         "results_dir": save_path,
-    #     }
-    # except Exception as e:
-    #     raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
-
-    video_dir = "dataprocess/videos"
-    video_files = [f for f in os.listdir(video_dir) if f.endswith(".mp4")]
-
+    adversarial_videos = [f for f in os.listdir(ADVERSARIAL_VIDEO_DIR) if f.endswith(".mp4")]
     results = []
-    for video_file in video_files:
-        video_path = os.path.join(video_dir, video_file)
-        try:
-             # Extract attention and logits
-            spatial_attention, temporal_attention, frames, logits = extractor.extract_attention(video_path)
-            prediction_idx = torch.argmax(logits, dim=1).item()
-            prediction = extractor.model.config.id2label[prediction_idx]
 
-            # Create a unique directory for each video’s result
-            video_result_dir = os.path.join(OUTPUT_DIR, os.path.splitext(video_file)[0])
+    for video_name in adversarial_videos:
+        video_path = os.path.join(ADVERSARIAL_VIDEO_DIR, video_name)
+        try:
+            spatial_attention, temporal_attention, frames, logits = attention_extractor.extract_attention(video_path)
+            prediction_idx = torch.argmax(logits, dim=1).item()
+            prediction = TimesformerAttentionExtractor.model.config.id2label[prediction_idx]
+
+            video_result_dir = os.path.join(OUTPUT_DIR, "adversarial",os.path.splitext(video_name)[0])
             os.makedirs(video_result_dir, exist_ok=True)
 
-            # Save visualizations
-            extractor.visualize_attention(
-                spatial_attention, temporal_attention, frames, video_result_dir, prediction, "Unknown"
+            # Save visualization
+            attention_extractor.visualize_attention(
+                spatial_attention, temporal_attention, frames, video_result_dir, prediction, "adversarial"
             )
-            
-
             results.append({
-                "video_file": video_file,
+                "video_file": video_name,
+                "video_type": "adversarial",
                 "prediction": prediction,
-                "results_dir": video_result_dir 
+                "results_dir": video_result_dir
             })
         except Exception as e:
-            results.append({"video_file": video_file, "error": str(e)})
+            results.append({
+                "video_file": video_name,
+                "video_type": "adversarial",
+                "error": str(e)
+            })
 
     return {"results": results}
+
+
+@app.post("/process-adversarial-videos")
+async def process_adversarial_temporal_spatial():
+    """Process adversarial videos using Temporal-Spatial XAI"""
+    try:
+        response = {"message": "Processing adversarial videos", "clean_videos": []}
+
+        if not os.path.exists(ADVERSARIAL_VIDEO_DIR):
+            raise HTTPException(status_code=404, detail="Adversarial video directory not found")
+
+        adversarial_videos = [f for f in os.listdir(ADVERSARIAL_VIDEO_DIR) if f.endswith(".mp4")]
+        response = {"message": "Processing adversarial videos", "adversarial_videos": []}
+
+        for video_name in adversarial_videos:
+            video_path = os.path.join(ADVERSARIAL_VIDEO_DIR, video_name)
+            output_dir = os.path.join(OUTPUT_DIR, video_name)
+            os.makedirs(output_dir, exist_ok=True)
+
+            predicted_label, frames_dir, json_path, heatmap_video_path = process_video(
+                video_path, output_dir, extractor=temporal_spatial_extractor
+            )
+
+            visualization_path = create_sample_frames_visualization(
+                video_name=os.path.splitext(video_name)[0],
+                results_dir=output_dir
+            )
+
+            response["adversarial_videos"].append({
+                "video_name": video_name,
+                "predicted_label": predicted_label,
+                "frames_directory": frames_dir,
+                "attention_json_path": json_path,
+                "heatmap_video_path": heatmap_video_path,
+                "visualization_path": visualization_path
+            })
+
+        return response
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8005)

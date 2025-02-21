@@ -93,6 +93,9 @@ async def staa_video_explain(request: VideoExplainRequest):
         logging.error(f"Error in staa_video_explain: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing video: {str(e)}")
 
+@app.get("/health")
+def health_check():
+    return {"status": "OK"}
 
        
 

@@ -173,7 +173,9 @@ async def process_kinetics_dataset(data: dict):
         print(f"❌ ERROR in process_kinetics_dataset: {error_message}")
         raise HTTPException(status_code=500, detail=error_message)
 
-
+@app.get("/health")
+def health_check():
+    return {"status": "OK"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)

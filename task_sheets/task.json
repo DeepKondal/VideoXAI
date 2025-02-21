@@ -35,7 +35,7 @@
     "base_url": "http://127.0.0.1:8003",
     "datasets": {
       "kinetics_video": {
-        "video_path": "dataprocess/videos/",
+        "video_path": "dataprocess/videos",
         "num_frames": 8
       }
     }

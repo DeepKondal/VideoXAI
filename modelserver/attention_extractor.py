@@ -13,8 +13,8 @@ class AttentionExtractor:
         self.model = TimesformerForVideoClassification.from_pretrained(model_name)
         self.model.to(device)
         self.device = device
-        self.image_processor = AutoImageProcessor.from_pretrained(model_name, use_fast=True)
-        # self.image_processor = AutoImageProcessor.from_pretrained(model_name)
+        # self.image_processor = AutoImageProcessor.from_pretrained(model_name, use_fast=True)
+        self.image_processor = AutoImageProcessor.from_pretrained(model_name)
 
     def print_model_structure(self):
         print(self.model)

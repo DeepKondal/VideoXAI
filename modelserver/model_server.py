@@ -90,8 +90,15 @@ async def process_timesformer_original_videos():
             prediction_idx = torch.argmax(logits, dim=1).item()
             prediction = timesformer_extractor.model.config.id2label[prediction_idx]
 
-            # Save results
-            video_result_dir = os.path.join(OUTPUT_DIR, "clean", os.path.splitext(video_file)[0])
+            # # Save results
+            # video_result_dir = os.path.join(OUTPUT_DIR, "clean", os.path.splitext(video_file)[0])
+            # os.makedirs(video_result_dir, exist_ok=True)
+            # ✅ Create a dedicated `prediction` folder inside `clean`
+            prediction_dir = os.path.join(OUTPUT_DIR, "clean", "prediction")
+            os.makedirs(prediction_dir, exist_ok=True)
+
+            # ✅ Create a subfolder for each video inside `clean/prediction/`
+            video_result_dir = os.path.join(prediction_dir, os.path.splitext(video_file)[0])
             os.makedirs(video_result_dir, exist_ok=True)
 
             # Save visualization
@@ -155,6 +162,9 @@ async def process_and_visualize_original_videos():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
+@app.get("/health")
+def health_check():
+    return {"status": "OK"}
 
 if __name__ == "__main__":
     import uvicorn

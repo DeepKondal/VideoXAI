@@ -61,9 +61,14 @@ async def process_adversarial_timesformer():
         try:
             spatial_attention, temporal_attention, frames, logits = attention_extractor.extract_attention(video_path)
             prediction_idx = torch.argmax(logits, dim=1).item()
-            prediction = TimesformerAttentionExtractor.model.config.id2label[prediction_idx]
+            prediction = attention_extractor.model.config.id2label[prediction_idx]
 
-            video_result_dir = os.path.join(OUTPUT_DIR, "adversarial",os.path.splitext(video_name)[0])
+            # ✅ Create the `prediction` folder inside `adversarial`
+            prediction_dir = os.path.join(OUTPUT_DIR, "adversarial", "prediction")
+            os.makedirs(prediction_dir, exist_ok=True)
+
+            # ✅ Create a subfolder for each video inside `adversarial/prediction/`
+            video_result_dir = os.path.join(prediction_dir, os.path.splitext(video_name)[0])
             os.makedirs(video_result_dir, exist_ok=True)
 
             # Save visualization
@@ -125,6 +130,10 @@ async def process_adversarial_temporal_spatial():
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+@app.get("/health")
+def health_check():
+    return {"status": "OK"}
 
 if __name__ == "__main__":
     import uvicorn

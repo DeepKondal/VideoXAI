@@ -193,7 +193,9 @@ def create_sample_frames_visualization(video_name, num_segments=8, results_dir='
         temporal_attention_smoothed = (temporal_attention_smoothed - temporal_attention_smoothed.min()) / (temporal_attention_smoothed.max() - temporal_attention_smoothed.min())
         
         # Select key frames based on local maxima
-        peaks, _ = find_peaks(temporal_attention_smoothed, distance=len(temporal_attention_smoothed)//num_segments)
+        # peaks, _ = find_peaks(temporal_attention_smoothed, distance=len(temporal_attention_smoothed)//num_segments)
+        distance = max(1, len(temporal_attention_smoothed) // num_segments)
+        peaks, _ = find_peaks(temporal_attention_smoothed, distance=distance)
         if len(peaks) < num_segments:
             additional_frames = np.linspace(0, len(temporal_attention_smoothed)-1, num_segments-len(peaks), dtype=int)
             key_frame_indices = np.sort(np.concatenate([peaks, additional_frames]))

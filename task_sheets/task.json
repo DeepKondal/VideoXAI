@@ -17,6 +17,16 @@
       }
     }
   },
+
+  "xai_config": {
+    "base_url": "http://127.0.0.1:8003",
+    "datasets": {
+      "kinetics_video": {
+        "video_path": "dataprocess/videos",
+        "num_frames": 8
+      }
+    }
+  },
   "model_config": {
     "base_urls": [
       "http://127.0.0.1:8002",
@@ -27,15 +37,6 @@
         "model_name": "facebook/timesformer-base-finetuned-k400",
         "original_video_dir": "dataprocess/videos",
         "adversarial_video_dir": "dataprocess/FGSM",
-        "num_frames": 8
-      }
-    }
-  },
-  "xai_config": {
-    "base_url": "http://127.0.0.1:8003",
-    "datasets": {
-      "kinetics_video": {
-        "video_path": "dataprocess/videos",
         "num_frames": 8
       }
     }

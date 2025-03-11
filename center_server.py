@@ -212,15 +212,15 @@ async def run_pipeline_from_config(config):
     expected_video_count = len(os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"]))
     await wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count)
 
-  
+    
+    print("🔹 Running XAI analysis...")
+    await process_xai_config(config["xai_config"])
+    print("✅ XAI analysis complete.")
+
     
     print("🔹 Processing videos using model server...")
     await process_model_config(config["model_config"], expected_video_count)
     print("✅ Model processing complete.")
-
-    print("🔹 Running XAI analysis...")
-    await process_xai_config(config["xai_config"])
-    print("✅ XAI analysis complete.")
 
 @app.get("/health")
 def health_check():

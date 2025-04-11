@@ -7,7 +7,7 @@ import pandas as pd
 from PIL import Image, ImageFilter
 import aiofiles
 import asyncio
-from azure.storage.blob.aio import BlobServiceClient
+
 
 
 class DataProcess:
@@ -192,12 +192,36 @@ class DataProcess:
         output_dir = os.path.join(self.base_storage_address, "videos", video_name)
         os.makedirs(output_dir, exist_ok=True)
 
-        container = av.open(video_path)
-        frames = [frame.to_image() for frame in container.decode(video=0)]
-        sampled_frames = [frames[i] for i in np.linspace(0, len(frames) - 1, num_frames, dtype=int)]
+        # container = av.open(video_path)
+        # frames = [frame.to_image() for frame in container.decode(video=0)]
+        # sampled_frames = [frames[i] for i in np.linspace(0, len(frames) - 1, num_frames, dtype=int)]
 
-        for idx, frame in enumerate(sampled_frames):
-            frame.save(os.path.join(output_dir, f"frame_{idx + 1}.jpg"))
+        # for idx, frame in enumerate(sampled_frames):
+        #     frame.save(os.path.join(output_dir, f"frame_{idx + 1}.jpg"))
 
-        label = self.get_label(video_name)
-        return {"video_name": video_name, "label": label, "frame_dir": output_dir}
+        # label = self.get_label(video_name)
+        # return {"video_name": video_name, "label": label, "frame_dir": output_dir}
+        try:
+            container = av.open(video_path)
+            frames = [frame.to_image() for frame in container.decode(video=0)]
+            
+            if len(frames) == 0:
+                print(f"❌ No frames extracted from {video_path}")
+                return {"video_name": video_name, "label": "Unknown", "frame_dir": None}
+
+            print(f"✅ Extracted {len(frames)} frames from {video_path}")
+
+            sampled_frames = [frames[i] for i in np.linspace(0, len(frames) - 1, num_frames, dtype=int)]
+            print(f"📌 Sampled frame indices: {np.linspace(0, len(frames) - 1, num_frames, dtype=int)}")
+
+            for idx, frame in enumerate(sampled_frames):
+                frame_path = os.path.join(output_dir, f"frame_{idx + 1}.jpg")
+                frame.save(frame_path)
+                print(f"🖼️ Saved frame {idx + 1} to {frame_path}")
+
+            label = self.get_label(video_name)
+            return {"video_name": video_name, "label": label, "frame_dir": output_dir}
+
+        except Exception as e:
+            print(f"❌ ERROR processing {video_path}: {e}")
+            return {"video_name": video_name, "label": "Error", "frame_dir": None}

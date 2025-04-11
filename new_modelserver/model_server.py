@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, BackgroundTasks, HTTPException ,File
 from pydantic import BaseModel
 import Model_ResNet
@@ -75,6 +74,7 @@ async def process_adversarial_timesformer():
             attention_extractor.visualize_attention(
                 spatial_attention, temporal_attention, frames, video_result_dir, prediction, "adversarial"
             )
+            
             results.append({
                 "video_file": video_name,
                 "video_type": "adversarial",
@@ -111,11 +111,11 @@ async def process_adversarial_temporal_spatial():
             predicted_label, frames_dir, json_path, heatmap_video_path = process_video(
                 video_path, output_dir, extractor=temporal_spatial_extractor
             )
-
             visualization_path = create_sample_frames_visualization(
                 video_name=os.path.splitext(video_name)[0],
                 results_dir=output_dir
             )
+            
 
             response["adversarial_videos"].append({
                 "video_name": video_name,

@@ -157,45 +157,60 @@ async def process_model_config(model_config, expected_video_count):
 #             print(f"Video path {video_dir} is not a directory.")
 
 async def process_xai_config(xai_config):
-    """Processes XAI explanations for both original and adversarial videos."""
+    """Processes XAI explanations for both clean and adversarial videos as defined in the config."""
     xai_server = xai_config['base_url']
 
-    for dataset, settings in xai_config['datasets'].items():
-        original_video_dir = settings.get('video_path', 'dataprocess/videos/')
-        adversarial_video_dir = original_video_dir.replace("videos", "FGSM")
+    for dataset_name, settings in xai_config['datasets'].items():
+        # Explicit paths from config
+        original_video_dir = settings.get('video_path', 'dataprocess/videos')
+        adversarial_video_dir = settings.get('adversarial_video_path', 'dataprocess/FGSM')
         num_frames = settings.get('num_frames', 8)
 
-        for video_dir, video_type in [(original_video_dir, "clean"), (adversarial_video_dir, "adversarial")]:
+        video_types = {
+            "clean": original_video_dir,
+            "adversarial": adversarial_video_dir
+        }
+
+        for video_type, video_dir in video_types.items():
             if not os.path.isdir(video_dir):
-                print(f"⚠ {video_type.capitalize()} video path not found. Skipping.")
+                print(f"⚠ Directory not found for {video_type} videos: {video_dir}")
                 continue
 
-            video_files = [os.path.abspath(os.path.join(video_dir, f)) for f in os.listdir(video_dir) if f.endswith(".mp4")]
+            video_files = [
+                os.path.abspath(os.path.join(video_dir, f))
+                for f in os.listdir(video_dir)
+                if f.endswith(".mp4")
+            ]
 
             if not video_files:
-                print(f"⚠ No {video_type} videos found. Skipping XAI processing.")
+                print(f"⚠ No {video_type} videos found in: {video_dir}")
                 continue
 
             for video_file in video_files:
                 try:
-                    data = {"video_path": video_file, "num_frames": num_frames}
+                    data = {
+                        "video_path": video_file,
+                        "num_frames": num_frames
+                    }
 
-                    print(f"📡 Sending XAI request for {video_type} video to {xai_server}: {video_file}")
-                    xai_full_url = f"{xai_server}/staa-video-explain/"
-                    xai_response = await async_http_post(xai_full_url, json_data=data)
+                    print(f"📡 Sending {video_type} video to XAI server: {video_file}")
+                    xai_endpoint = f"{xai_server}/staa-video-explain/"
+                    xai_response = await async_http_post(xai_endpoint, json_data=data)
 
-                    xai_results_dir = os.path.join("xai_results", video_type)
-                    os.makedirs(xai_results_dir, exist_ok=True)
+                    # Save response to appropriate folder
+                    result_dir = os.path.join("xai_results", video_type)
+                    os.makedirs(result_dir, exist_ok=True)
 
-                    json_file_path = os.path.join(xai_results_dir, os.path.basename(video_file).replace(".mp4", "_attention.json"))
-                    with open(json_file_path, "w") as json_file:
-                        json.dump(xai_response, json_file, indent=4)
+                    json_file_name = os.path.basename(video_file).replace(".mp4", "_attention.json")
+                    json_file_path = os.path.join(result_dir, json_file_name)
 
-                    print(f"✅ {video_type.capitalize()} XAI response saved: {json_file_path}")
+                    with open(json_file_path, "w") as f:
+                        json.dump(xai_response, f, indent=4)
+
+                    print(f"✅ XAI result saved for {video_type}: {json_file_path}")
 
                 except Exception as e:
-                    print(f"❌ Error processing XAI for {video_type} video {video_file}: {e}")
-
+                    print(f"❌ Failed to process {video_type} video {video_file}: {str(e)}")
 
 async def run_pipeline_from_config(config):
     """Runs the pipeline step-by-step while ensuring all videos are ready before model processing."""
@@ -209,18 +224,22 @@ async def run_pipeline_from_config(config):
 
 
     adversarial_video_dir = config["model_config"]["models"]["kinetics_video"]["adversarial_video_dir"]
-    expected_video_count = len(os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"]))
+    expected_video_count = len([
+    f for f in os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"])
+    if f.endswith(".mp4")
+        ])
     await wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count)
 
     
-    print("🔹 Running XAI analysis...")
-    await process_xai_config(config["xai_config"])
-    print("✅ XAI analysis complete.")
-
+    
     
     print("🔹 Processing videos using model server...")
     await process_model_config(config["model_config"], expected_video_count)
     print("✅ Model processing complete.")
+    
+    print("🔹 Running XAI analysis...")
+    await process_xai_config(config["xai_config"])
+    print("✅ XAI analysis complete.")
 
 @app.get("/health")
 def health_check():

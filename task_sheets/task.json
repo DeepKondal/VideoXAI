@@ -7,26 +7,22 @@
       }
     }
   },
-  "perturbation_config": {
-    "server_url": "http://127.0.0.1:8001",
-    "datasets": {
-      "kinetics_400": {
-        "perturbation_type": "adversarial_attack",
-        "severity": 1,
-        "video_directory": "dataprocess/videos"
-      }
-    }
+ "perturbation_config": {
+  "servers": {
+    "vbad_targeted": "http://127.0.0.1:8007",
+    "vbad_untargeted": "http://127.0.0.1:8006"
+  }
   },
   "model_config": {
     "base_urls": [
-      "http://127.0.0.1:8002",
-      "http://127.0.0.1:8005"
+      "http://127.0.0.1:8008",
+      "http://127.0.0.1:8009"
     ],
     "models": {
       "kinetics_video": {
         "model_name": "facebook/timesformer-base-finetuned-k400",
-        "original_video_dir": "dataprocess/videos",
-        "adversarial_video_dir": "dataprocess/FGSM",
+        "targeted_dir": "untargeted/final_perturbed_videos/targeted",
+        "untargeted_dir": "untargeted/final_perturbed_videos/untargeted",
         "num_frames": 8
       }
     }
@@ -35,8 +31,8 @@
     "base_url": "http://127.0.0.1:8003",
     "datasets": {
       "kinetics_video": {
-        "video_path": "dataprocess/videos",
-        "adversarial_video_path": "dataprocess/FGSM",
+        "targeted_path": "untargeted/final_perturbed_videos/targeted",
+        "untargeted_path": "untargeted/final_perturbed_videos/untargeted",
         "num_frames": 8
       }
     }

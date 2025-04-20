@@ -48,79 +48,95 @@ async def process_upload_config(upload_config):
         print(f"✅ Uploaded dataset {dataset_id} successfully.")
 
 
-async def process_perturbation_config(perturbation_config):
-    """Applies perturbation before model processing."""
-    if not perturbation_config['datasets']:
-        print("No perturbation configured, skipping this step.")
-        return
 
-    url = perturbation_config['server_url']
-    for dataset, settings in perturbation_config['datasets'].items():
-        if settings['perturbation_type'] == "none":
-            print(f"Skipping perturbation for dataset {dataset}.")
-            continue
+# async def process_perturbation_config(perturbation_config):  # For FGSM attack perturbation , add below perturbation_config
+#     """Applies perturbation before model processing."""
+#     if not perturbation_config['datasets']:
+#         print("No perturbation configured, skipping this step.")
+#         return
 
-        full_url = f"{url}/apply-perturbation/{dataset}/{settings['perturbation_type']}/{settings['severity']}"
-        await async_http_post(full_url)
+#     url = perturbation_config['server_url']
+#     for dataset, settings in perturbation_config['datasets'].items():
+#         if settings['perturbation_type'] == "none":
+#             print(f"Skipping perturbation for dataset {dataset}.")
+#             continue
 
-    print("✅ Perturbation process started.")
+#         full_url = f"{url}/apply-perturbation/{dataset}/{settings['perturbation_type']}/{settings['severity']}"
+#         await async_http_post(full_url)
 
-
-async def wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count):
-    """Waits until ALL adversarial videos are processed before proceeding."""
-    print(f"⏳ Waiting for all {expected_video_count} adversarial videos in {adversarial_video_dir}...")
-
-    while True:
-        if not os.path.exists(adversarial_video_dir):
-            print(f"⚠ Adversarial directory `{adversarial_video_dir}` not found. Retrying in 5 seconds...")
-            await asyncio.sleep(5)
-            continue
-
-        adversarial_videos = [f for f in os.listdir(adversarial_video_dir) if f.endswith(".mp4")]
-
-        if len(adversarial_videos) >= expected_video_count:
-            break
-
-        print(f"⚠ {len(adversarial_videos)}/{expected_video_count} adversarial videos found. Retrying in 5 seconds...")
-        await asyncio.sleep(5)
-
-    print("✅ All adversarial videos are ready. Proceeding with Model Processing...")
+#     print("✅ Perturbation process started.")
 
 
 
-async def process_model_config(model_config, expected_video_count):
-    """Processes videos for both original (8002) and adversarial (8005) videos asynchronously."""
+async def process_perturbation_config(perturbation_config):        # For VBAD attack perturbation , add below perturbation_config
+    """Trigger both targeted and untargeted perturbations in parallel."""
+    servers = perturbation_config.get("servers", {})
+    tasks = []
+
+    if "vbad_targeted" in servers:
+        print("🚀 Launching targeted attack...")
+        targeted_url = f"{servers['vbad_targeted']}/run-vbad-targeted"
+        tasks.append(async_http_post(targeted_url))
+
+    if "vbad_untargeted" in servers:
+        print("🚀 Launching untargeted attack...")
+        untargeted_url = f"{servers['vbad_untargeted']}/run-vbad-untargeted"
+        tasks.append(async_http_post(untargeted_url))
+
+    # Run both tasks in parallel
+    await asyncio.gather(*tasks)
+    print("✅ Both VBAD attacks triggered in parallel.")
+
+
+# async def wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count):
+    # """Waits until ALL adversarial videos are processed before proceeding."""
+    # print(f"⏳ Waiting for all {expected_video_count} adversarial videos in {adversarial_video_dir}...")
+
+    # while True:
+    #     if not os.path.exists(adversarial_video_dir):
+    #         print(f"⚠ Adversarial directory `{adversarial_video_dir}` not found. Retrying in 5 seconds...")
+    #         await asyncio.sleep(5)
+    #         continue
+
+    #     adversarial_videos = [f for f in os.listdir(adversarial_video_dir) if f.endswith(".mp4")]
+
+    #     if len(adversarial_videos) >= expected_video_count:
+    #         break
+
+    #     print(f"⚠ {len(adversarial_videos)}/{expected_video_count} adversarial videos found. Retrying in 5 seconds...")
+    #     await asyncio.sleep(5)
+
+    # print("✅ All adversarial videos are ready. Proceeding with Model Processing...")
+
+
+
+# async def process_model_config(model_config, expected_video_count):
+async def process_model_config(model_config):
     base_urls = model_config["base_urls"]
-    original_video_dir = model_config["models"]["kinetics_video"]["original_video_dir"]
-    adversarial_video_dir = model_config["models"]["kinetics_video"]["adversarial_video_dir"]
+    targeted_dir = model_config["models"]["kinetics_video"]["targeted_dir"]
+    untargeted_dir = model_config["models"]["kinetics_video"]["untargeted_dir"]
     num_frames = model_config["models"]["kinetics_video"]["num_frames"]
 
     tasks = []
-    async with aiohttp.ClientSession() as session:
-        for base_url in base_urls:
-            if "8002" in base_url:
-                # Process Original Videos on Server 8002
-                full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-original-videos"
-                full_url_2 = f"{base_url}/process-original-videos"
+    for base_url in base_urls:
+        if "8008" in base_url:
+            full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-targeted-videos"
+            full_url_2 = f"{base_url}/process-targeted-videos"
 
-                print(f"📡 Sending Original Videos to `{full_url_1}` and `{full_url_2}`")
-                tasks.append(async_http_post(full_url_1, json_data={"video_directory": original_video_dir, "num_frames": num_frames}))
-                tasks.append(async_http_post(full_url_2, json_data={"video_directory": original_video_dir, "num_frames": num_frames}))
+            print(f"📡 Sending targeted Videos to `{full_url_1}` and `{full_url_2}`")
+            tasks.append(asyncio.create_task(async_http_post(full_url_1, json_data={"video_directory": targeted_dir, "num_frames": num_frames})))
+            tasks.append(asyncio.create_task(async_http_post(full_url_2, json_data={"video_directory": targeted_dir, "num_frames": num_frames})))
 
-            elif "8005" in base_url:
-                # Process Adversarial Videos on Server 8005
-                full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-adversarial-videos"
-                full_url_2 = f"{base_url}/process-adversarial-videos"
+        elif "8009" in base_url:
+            full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-untargeted-videos"
+            full_url_2 = f"{base_url}/process-untargeted-videos"
 
-                print(f"📡 Sending Adversarial Videos to `{full_url_1}` and `{full_url_2}`")
-                tasks.append(async_http_post(full_url_1, json_data={"video_directory": adversarial_video_dir, "num_frames": num_frames}))
-                tasks.append(async_http_post(full_url_2, json_data={"video_directory": adversarial_video_dir, "num_frames": num_frames}))
+            print(f"📡 Sending untargeted Videos to `{full_url_1}` and `{full_url_2}`")
+            tasks.append(asyncio.create_task(async_http_post(full_url_1, json_data={"video_directory": untargeted_dir, "num_frames": num_frames})))
+            tasks.append(asyncio.create_task(async_http_post(full_url_2, json_data={"video_directory": untargeted_dir, "num_frames": num_frames})))
 
-        await asyncio.gather(*tasks)
-        
-
-        print("✅ Model processing started asynchronously. Proceeding to XAI Analysis")
-
+    await asyncio.gather(*tasks)
+    print("✅ Model processing started asynchronously. Proceeding to XAI Analysis")
 # 处理 XAI 配置
 # async def process_xai_config(xai_config):
 #     base_url = xai_config['base_url']
@@ -162,13 +178,13 @@ async def process_xai_config(xai_config):
 
     for dataset_name, settings in xai_config['datasets'].items():
         # Explicit paths from config
-        original_video_dir = settings.get('video_path', 'dataprocess/videos')
-        adversarial_video_dir = settings.get('adversarial_video_path', 'dataprocess/FGSM')
+        targeted_dir = settings.get('video_path', 'untargeted/final_perturbed_videos/targeted')
+        untargeted_dir = settings.get('adversarial_video_path', 'untargeted/final_perturbed_videos/untargeted')
         num_frames = settings.get('num_frames', 8)
 
         video_types = {
-            "clean": original_video_dir,
-            "adversarial": adversarial_video_dir
+            "targeted": targeted_dir,
+            "untargeted": untargeted_dir
         }
 
         for video_type, video_dir in video_types.items():
@@ -223,18 +239,19 @@ async def run_pipeline_from_config(config):
     print("✅ Perturbation complete.")
 
 
-    adversarial_video_dir = config["model_config"]["models"]["kinetics_video"]["adversarial_video_dir"]
-    expected_video_count = len([
-    f for f in os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"])
-    if f.endswith(".mp4")
-        ])
-    await wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count)
+    # adversarial_video_dir = config["model_config"]["models"]["kinetics_video"]["adversarial_video_dir"]
+    # expected_video_count = len([
+    # f for f in os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"])
+    # if f.endswith(".mp4")
+    #     ])
+    # await wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count)
 
     
     
     
     print("🔹 Processing videos using model server...")
-    await process_model_config(config["model_config"], expected_video_count)
+    # await process_model_config(config["model_config"], expected_video_count)
+    await process_model_config(config["model_config"])
     print("✅ Model processing complete.")
     
     print("🔹 Running XAI analysis...")

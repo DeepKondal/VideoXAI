@@ -11,7 +11,7 @@ args = parser.parse_args()
 # Convert Video to .npy
 def convert_video_to_npy(video_path):
     save_name = os.path.basename(os.path.splitext(video_path)[0]) + ".npy"
-    save_path = os.path.join("videos", save_name)
+    save_path = os.path.join("untargeted/videos", save_name)
     cap = cv2.VideoCapture(video_path)
     frames = []
     for _ in range(64):

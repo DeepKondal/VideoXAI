@@ -82,6 +82,7 @@ def main():
     if vid.shape[-1] == 3:
         vid = vid.permute(0, 3, 1, 2)
     vid_label = args.label
+    
 
     target_vid = np.load(args.target_video)
     target_vid = torch.tensor(target_vid, dtype=torch.float, device='cuda')

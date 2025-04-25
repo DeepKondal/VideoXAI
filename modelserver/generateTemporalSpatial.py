@@ -320,6 +320,9 @@
 #         traceback.print_exc()
 
 
+
+# Below code only process 72 frames in a video
+
 import os
 import av
 import torch

@@ -11,12 +11,12 @@ parser.add_argument("--untargeted", action="store_true", help="Enable untargeted
 args = parser.parse_args()
 
 # Directories
-RAW_VIDEOS_DIR = "/Users/ravindersingh/Desktop/strangler/XAIport/dataprocess/raw_videos"
-VIDEOS_DIR = "videos"
-OUTPUT_TARGETED_DIR = "output_videos_targeted"
-OUTPUT_UNTARGETED_DIR = "output_videos_untargeted"
-FINAL_TARGETED_DIR = "final_perturbed_videos/targeted"
-FINAL_UNTARGETED_DIR = "final_perturbed_videos/untargeted"
+RAW_VIDEOS_DIR = "dataprocess\\raw_videos"
+VIDEOS_DIR = "untargeted/videos"
+OUTPUT_TARGETED_DIR = "untargeted/output_videos_targeted"
+OUTPUT_UNTARGETED_DIR = "untargeted/output_videos_untargeted"
+FINAL_TARGETED_DIR = "untargeted/final_perturbed_videos/targeted"
+FINAL_UNTARGETED_DIR = "untargeted/final_perturbed_videos/untargeted"
 
 # Ensure necessary directories exist
 os.makedirs(VIDEOS_DIR, exist_ok=True)
@@ -46,8 +46,9 @@ for video_name, label in video_entries:
     npy_path = os.path.join(VIDEOS_DIR, f"{os.path.splitext(video_name)[0]}.npy")
 
     # Define separate output paths for targeted and untargeted attacks
-    output_targeted_npy = os.path.join(OUTPUT_TARGETED_DIR, f"output_{label}.npy")
-    output_untargeted_npy = os.path.join(OUTPUT_UNTARGETED_DIR, f"output_{label}.npy")
+    video_base = os.path.splitext(video_name)[0]
+    output_targeted_npy = os.path.join(OUTPUT_TARGETED_DIR, f"output_{video_base}_{label}.npy")
+    output_untargeted_npy = os.path.join(OUTPUT_UNTARGETED_DIR, f"output_{video_base}_{label}.npy")
 
     print(f"📌 Processing {video_name} → {npy_path}")
 
@@ -62,6 +63,9 @@ for video_name, label in video_entries:
                 "--label", label,
                 "--adv-save-path", output_targeted_npy,
                 "--sigma", str(args.sigma),
+                "--target-video", "untargeted/videos/193.npy",  #targeted npy file , can be changed for different file 
+                "--target-label", "193",                        # attack label , 
+
             ]
             subprocess.run(attack_command, check=True)
             torch.cuda.empty_cache()
@@ -88,22 +92,23 @@ for video_name, label in video_entries:
 
 # Step 3: Convert adversarial .npy videos to .mp4 format
 for video_name, label in video_entries:
-    output_targeted_npy = os.path.join(OUTPUT_TARGETED_DIR, f"output_{label}.npy")
-    output_untargeted_npy = os.path.join(OUTPUT_UNTARGETED_DIR, f"output_{label}.npy")
+    video_base = os.path.splitext(video_name)[0]
+    output_targeted_npy = os.path.join(OUTPUT_TARGETED_DIR, f"output_{video_base}_{label}.npy")
+    output_untargeted_npy = os.path.join(OUTPUT_UNTARGETED_DIR, f"output_{video_base}_{label}.npy")
 
-    final_targeted_video = os.path.join(FINAL_TARGETED_DIR, f"adv_{label}.mp4")
-    final_untargeted_video = os.path.join(FINAL_UNTARGETED_DIR, f"adv_{label}.mp4")
+    final_targeted_video = os.path.join(FINAL_TARGETED_DIR, f"adv_{video_base}_{label}.mp4")
+    final_untargeted_video = os.path.join(FINAL_UNTARGETED_DIR, f"adv_{video_base}_{label}.mp4")
 
     # Convert Targeted Videos
     if not args.untargeted and os.path.exists(output_targeted_npy) and not os.path.exists(final_targeted_video):
         print(f"🎬 Converting {output_targeted_npy} → {final_targeted_video}")
-        subprocess.run(["python", "convert_npy_to_mp4.py", "--npy", output_targeted_npy, "--output", final_targeted_video, "--fps", "30"])
+        subprocess.run(["python", "untargeted/convert_npy_to_mp4.py", "--npy", output_targeted_npy, "--output", final_targeted_video, "--fps", "30"])
         torch.cuda.empty_cache()
 
     # Convert Untargeted Videos
     if args.untargeted and os.path.exists(output_untargeted_npy) and not os.path.exists(final_untargeted_video):
         print(f"🎬 Converting {output_untargeted_npy} → {final_untargeted_video}")
-        subprocess.run(["python", "convert_npy_to_mp4.py", "--npy", output_untargeted_npy, "--output", final_untargeted_video, "--fps", "30"])
+        subprocess.run(["python", "untargeted/convert_npy_to_mp4.py", "--npy", output_untargeted_npy, "--output", final_untargeted_video, "--fps", "30"])
         torch.cuda.empty_cache()
 
 print("🎉 Batch processing completed!")

@@ -3,7 +3,7 @@
     "server_url": "http://127.0.0.1:8001",
     "datasets": {
       "kinetics_400": {
-        "local_video_dir": "dataprocess/videos"
+        "local_video_dir": "dataprocess/raw_videos"
       }
     }
   },
@@ -15,8 +15,8 @@
   },
   "model_config": {
     "base_urls": [
-      "http://127.0.0.1:8008",
-      "http://127.0.0.1:8009"
+      "http://127.0.0.1:8010",
+      "http://127.0.0.1:8011"
     ],
     "models": {
       "kinetics_video": {

@@ -82,11 +82,12 @@ def main():
     if vid.shape[-1] == 3:
         vid = vid.permute(0, 3, 1, 2)
     vid_label = args.label
-    
+    if not args.untargeted:
+        target_vid = np.load(args.target_video)
 
-    target_vid = np.load(args.target_video)
-    target_vid = torch.tensor(target_vid, dtype=torch.float, device='cuda')
-    target_label = args.target_label
+    # target_vid = np.load(args.target_video)
+        target_vid = torch.tensor(target_vid, dtype=torch.float, device='cuda')
+        target_label = args.target_label
 
     if not untargeted:
         directions_generator.set_targeted_params(target_vid.cuda(), random_mask)
@@ -94,7 +95,7 @@ def main():
                                                        target_label, rank_transform=rank_transform,
                                                        image_split=image_split,
                                                        sub_num_sample=sub_num_sample, sigma=sigma,
-                                                       eps=0.05, max_iter=300000,
+                                                       eps=0.3, max_iter=300000,
                                                        sample_per_draw=sample_per_draw)
     else:
         directions_generator.set_untargeted_params(vid.cuda(), random_mask, scale=5.)

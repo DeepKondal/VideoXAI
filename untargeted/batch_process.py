@@ -63,6 +63,9 @@ for video_name, label in video_entries:
                 "--label", label,
                 "--adv-save-path", output_targeted_npy,
                 "--sigma", str(args.sigma),
+                "--target-video", "untargeted/videos/193.npy",  #targeted npy file , can be changed for different file 
+                "--target-label", "193",                        # attack label , 
+
             ]
             subprocess.run(attack_command, check=True)
             torch.cuda.empty_cache()

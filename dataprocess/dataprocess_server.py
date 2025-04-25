@@ -117,7 +117,7 @@ async def apply_perturbation(background_tasks: BackgroundTasks, dataset_id: str,
     Apply perturbation or adversarial attack on videos within the specified dataset.
     If 'adversarial_attack' is chosen, the FGSM-based attack will be applied.
     """
-    dataset_path = "dataprocess/videos"
+    dataset_path = "dataprocess/raw_videos"
 
     if perturbation_func_name == "adversarial_attack":
         # Apply adversarial attack using the provided FGSM implementation

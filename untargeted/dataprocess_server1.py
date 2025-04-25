@@ -8,7 +8,7 @@ import subprocess
 
 # the below function is used to run the batch process
 def run_vbad_untargeted_batch():
-    script_path = "C:\\Users\\r_ghatau\\Desktop\\XAIport\\VideoXAI\\untargeted\\batch_process.py"  # Change this to actual full path
+    script_path = "untargeted\\batch_process.py"  # Change this to actual full path
     cmd = [
         "python", script_path,
         "--video_list", "untargeted\kinetics400_val_list_videos.txt",

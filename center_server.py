@@ -13,8 +13,6 @@ app = FastAPI(title="Coordination Center")
 
 # Track processing status
 pipeline_status = {}
-traffic_count = {"8002": 0, "8005": 0}
-
 processed_videos = set()  
 async def async_http_post(url, json_data=None):
     """Sends an async HTTP POST request and handles errors."""
@@ -87,26 +85,31 @@ async def process_perturbation_config(perturbation_config):        # For VBAD at
     await asyncio.gather(*tasks)
     print("✅ Both VBAD attacks triggered in parallel.")
 
+async def wait_for_videos(video_dir: str, expected_video_count: int, poll_interval: float = 5.0, timeout: float = 120000.0):
+    """
+    Wait until the `video_dir` contains at least `expected_video_count` `.mp4` files.
+    """
+    start = time.time()
+    print(f"⏳ Waiting for {expected_video_count} videos in {video_dir}...")
 
-# async def wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count):
-    # """Waits until ALL adversarial videos are processed before proceeding."""
-    # print(f"⏳ Waiting for all {expected_video_count} adversarial videos in {adversarial_video_dir}...")
+    while True:
+        if not os.path.exists(video_dir):
+            print(f"⚠ Directory `{video_dir}` not found. Retrying in {poll_interval} seconds...")
+            await asyncio.sleep(poll_interval)
+            continue
 
-    # while True:
-    #     if not os.path.exists(adversarial_video_dir):
-    #         print(f"⚠ Adversarial directory `{adversarial_video_dir}` not found. Retrying in 5 seconds...")
-    #         await asyncio.sleep(5)
-    #         continue
+        video_files = [f for f in os.listdir(video_dir) if f.endswith(".mp4")]
 
-    #     adversarial_videos = [f for f in os.listdir(adversarial_video_dir) if f.endswith(".mp4")]
+        if len(video_files) >= expected_video_count:
+            print(f"✅ Found {len(video_files)} videos in {video_dir}. Proceeding to model processing.")
+            return
 
-    #     if len(adversarial_videos) >= expected_video_count:
-    #         break
+        # If the timeout has passed, raise an exception.
+        if (time.time() - start) > timeout:
+            raise HTTPException(status_code=408, detail=f"Timeout waiting for {expected_video_count} videos in {video_dir}")
 
-    #     print(f"⚠ {len(adversarial_videos)}/{expected_video_count} adversarial videos found. Retrying in 5 seconds...")
-    #     await asyncio.sleep(5)
-
-    # print("✅ All adversarial videos are ready. Proceeding with Model Processing...")
+        print(f"⚠ {len(video_files)}/{expected_video_count} videos found. Retrying in {poll_interval} seconds...")
+        await asyncio.sleep(poll_interval)
 
 
 
@@ -119,7 +122,7 @@ async def process_model_config(model_config):
 
     tasks = []
     for base_url in base_urls:
-        if "8008" in base_url:
+        if "8010" in base_url:
             full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-targeted-videos"
             full_url_2 = f"{base_url}/process-targeted-videos"
 
@@ -127,7 +130,7 @@ async def process_model_config(model_config):
             tasks.append(asyncio.create_task(async_http_post(full_url_1, json_data={"video_directory": targeted_dir, "num_frames": num_frames})))
             tasks.append(asyncio.create_task(async_http_post(full_url_2, json_data={"video_directory": targeted_dir, "num_frames": num_frames})))
 
-        elif "8009" in base_url:
+        elif "8011" in base_url:
             full_url_1 = f"{base_url}/facebook/timesformer-base-finetuned-k400/process-untargeted-videos"
             full_url_2 = f"{base_url}/process-untargeted-videos"
 
@@ -137,40 +140,6 @@ async def process_model_config(model_config):
 
     await asyncio.gather(*tasks)
     print("✅ Model processing started asynchronously. Proceeding to XAI Analysis")
-# 处理 XAI 配置
-# async def process_xai_config(xai_config):
-#     base_url = xai_config['base_url']
-#     # for dataset, settings in xai_config['datasets'].items():
-#         # dataset_id = settings.get('dataset_id', '')  # 提取 "dataset_id"
-#         # algorithms = settings.get('algorithms', [])  # 提取 "algorithms"
-#         # data = {
-#         #     "dataset_id": dataset_id,
-#         #     "algorithms": algorithms
-#         # }
-#         # print(data)
-#         # full_url = f"{base_url}/cam_xai/"
-#         # print(full_url)
-#         # await async_http_post(full_url, json_data=data)
-    
-#     for dataset, settings in xai_config['datasets'].items():
-#         video_dir = settings.get('video_path', '')
-#         num_frames = settings.get('num_frames', 8)
-        
-#         if os.path.isdir(video_dir):
-#             video_files = [os.path.join(video_dir, f) for f in os.listdir(video_dir) if f.endswith(".mp4")]
-#             for video_file in video_files:
-#                 data = {
-#                     "video_path": video_file,
-#                     "num_frames": num_frames
-#                 }
-#                 full_url = f"{base_url}/staa-video-explain/"
-#                 try:
-#                     response = await async_http_post(full_url, json_data=data)
-#                     print(f"XAI response for video {video_file}: {response}")
-#                 except Exception as e:
-#                     print(f"Error processing XAI for video {video_file}: {e}")
-#         else:
-#             print(f"Video path {video_dir} is not a directory.")
 
 async def process_xai_config(xai_config):
     """Processes XAI explanations for both clean and adversarial videos as defined in the config."""
@@ -238,14 +207,16 @@ async def run_pipeline_from_config(config):
     await process_perturbation_config(config["perturbation_config"])
     print("✅ Perturbation complete.")
 
+     # Count how many raw `.mp4` files we have to determine how many we expect in the adversarial directories
+    raw_video_dir = config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"]
+    expected_video_count = len([f for f in os.listdir(raw_video_dir) if f.endswith(".mp4")])
 
-    # adversarial_video_dir = config["model_config"]["models"]["kinetics_video"]["adversarial_video_dir"]
-    # expected_video_count = len([
-    # f for f in os.listdir(config["upload_config"]["datasets"]["kinetics_400"]["local_video_dir"])
-    # if f.endswith(".mp4")
-    #     ])
-    # await wait_for_all_adversarial_videos(adversarial_video_dir, expected_video_count)
+    targeted_dir = config["model_config"]["models"]["kinetics_video"]["targeted_dir"]
+    untargeted_dir = config["model_config"]["models"]["kinetics_video"]["untargeted_dir"]
 
+    # Wait for the expected number of videos in both the targeted and untargeted directories.
+    await wait_for_videos(targeted_dir, expected_video_count)
+    await wait_for_videos(untargeted_dir, expected_video_count)
     
     
     

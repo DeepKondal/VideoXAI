@@ -121,40 +121,6 @@ async def process_model_config(model_config, expected_video_count):
 
         print("✅ Model processing started asynchronously. Proceeding to XAI Analysis")
 
-# 处理 XAI 配置
-# async def process_xai_config(xai_config):
-#     base_url = xai_config['base_url']
-#     # for dataset, settings in xai_config['datasets'].items():
-#         # dataset_id = settings.get('dataset_id', '')  # 提取 "dataset_id"
-#         # algorithms = settings.get('algorithms', [])  # 提取 "algorithms"
-#         # data = {
-#         #     "dataset_id": dataset_id,
-#         #     "algorithms": algorithms
-#         # }
-#         # print(data)
-#         # full_url = f"{base_url}/cam_xai/"
-#         # print(full_url)
-#         # await async_http_post(full_url, json_data=data)
-    
-#     for dataset, settings in xai_config['datasets'].items():
-#         video_dir = settings.get('video_path', '')
-#         num_frames = settings.get('num_frames', 8)
-        
-#         if os.path.isdir(video_dir):
-#             video_files = [os.path.join(video_dir, f) for f in os.listdir(video_dir) if f.endswith(".mp4")]
-#             for video_file in video_files:
-#                 data = {
-#                     "video_path": video_file,
-#                     "num_frames": num_frames
-#                 }
-#                 full_url = f"{base_url}/staa-video-explain/"
-#                 try:
-#                     response = await async_http_post(full_url, json_data=data)
-#                     print(f"XAI response for video {video_file}: {response}")
-#                 except Exception as e:
-#                     print(f"Error processing XAI for video {video_file}: {e}")
-#         else:
-#             print(f"Video path {video_dir} is not a directory.")
 
 async def process_xai_config(xai_config):
     """Processes XAI explanations for both clean and adversarial videos as defined in the config."""

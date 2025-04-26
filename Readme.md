@@ -179,3 +179,4 @@ All processed outputs will be stored in:
 
 These include video frames, attention values, and model predictions.
 
+Note: During the VBAD pipeline, ensure that the video you are processing has the exact corresponding label number listed in the kinetics400_val_list_videos.txt file located inside the untargeted/ directory.

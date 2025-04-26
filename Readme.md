@@ -172,4 +172,4 @@ python center_server.py
   --data-binary "@task_sheets/task.json"
   ```
 
-##  Outputs (videos, attention values) will be stored in the `output/` directory. 
+Outputs (videos, attention values) will be stored in the `output/` directory. 

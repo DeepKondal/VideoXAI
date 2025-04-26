@@ -158,7 +158,7 @@ python dataprocess/dataprocess_server.py
 python modelserver/model_server.py
 python modelserver_adversarial/model_server.py
 python xaiserver/xai_server.py
-python center_server.py
+python center_server1.py
 ```
 ### Starting the Service
 
@@ -172,4 +172,10 @@ python center_server.py
   --data-binary "@task_sheets/task.json"
   ```
 
-Outputs (videos, attention values) will be stored in the `output/` directory. 
+All processed outputs will be stored in:
+
+- `output/` directory → for **FGSM (Adversarial)** pipeline  
+- `output1/` directory → for **VBAD (Targeted/Untargeted)** pipeline  
+
+These include video frames, attention values, and model predictions.
+

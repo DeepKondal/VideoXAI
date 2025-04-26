@@ -91,9 +91,9 @@ parso==0.8.3
 scikit-learn
 tomlkit
 toolz
-torch
-torchaudio
-torchvision
+torch==2.1.1
+torchaudio==2.1.1
+torchvision==0.16.1
 tornado
 urllib3==2.1.0
 uvicorn==0.24.0.post1

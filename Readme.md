@@ -18,7 +18,7 @@ XAIport is designed to deliver interpretable AI model predictions through a micr
 - FastAPI
 - httpx
 - uvicorn
-- Dependencies as listed in `requirements.txt`
+- Dependencies as listed in `requirements_fixed.txt`
 
 ### Installation Guide
 
@@ -34,89 +34,142 @@ XAIport is designed to deliver interpretable AI model predictions through a micr
    Install the necessary Python libraries with pip:
 
    ```bash
-   pip install -r requirements.txt
+   pip install -r requirements_fixed.txt
    ```
 
 3. **Clone the Repository**:
    Clone the repository to get the latest codebase:
 
    ```bash
-   git clone https://github.com/ZeruiW/XAIport.git
+   git clone https://github.com/DeepKondal/VideoXAI.git
    cd XAIport
    ```
 
 ### Configuration
+Before running the system, configure all necessary details such as API endpoints, database connections, and service-related configurations using a JSON file. Adjust the config.json file based on the task—either for VBAD (Targeted/Untargeted) or Adversarial (FGSM) attacks.
 
-Before running the system, configure all necessary details such as API endpoints, database connections, and other service-related configurations in a JSON format. Adjust the `config.json` file as needed.
-
-Example `config.json`:
+Example `config.json` for VBAD attacks:
 
 ```json
 {
   "upload_config": {
-    "server_url": "http://localhost:8000",
+    "server_url": "http://127.0.0.1:8001",
     "datasets": {
-      "dataset1": {
-        "local_zip_path": "/path/to/dataset1.zip"
+      "kinetics_400": {
+        "local_video_dir": "dataprocess/raw_videos"
       }
     }
   },
+ "perturbation_config": {
+  "servers": {
+    "vbad_targeted": "http://127.0.0.1:8007",
+    "vbad_untargeted": "http://127.0.0.1:8006"
+  }
+  },
   "model_config": {
-    "base_url": "http://model-service-url",
+    "base_urls": [
+      "http://127.0.0.1:8010",
+      "http://127.0.0.1:8011"
+    ],
     "models": {
-      "model1": {
-        "model_name": "ResNet50",
-        "perturbation_type": "noise",
-        "severity": 2
+      "kinetics_video": {
+        "model_name": "facebook/timesformer-base-finetuned-k400",
+        "targeted_dir": "untargeted/final_perturbed_videos/targeted",
+        "untargeted_dir": "untargeted/final_perturbed_videos/untargeted",
+        "num_frames": 8
+      }
+    }
+  },
+  "xai_config": {
+    "base_url": "http://127.0.0.1:8003",
+    "datasets": {
+      "kinetics_video": {
+        "targeted_path": "untargeted/final_perturbed_videos/targeted",
+        "untargeted_path": "untargeted/final_perturbed_videos/untargeted",
+        "num_frames": 8
       }
     }
   }
 }
+
 ```
+config.json for adversarial file 
+``` json
+{
+  "upload_config": {
+    "server_url": "http://127.0.0.1:8001",
+    "datasets": {
+      "kinetics_400": {
+        "local_video_dir": "dataprocess/videos"
+      }
+    }
+  },
+  "perturbation_config": {
+    "server_url": "http://127.0.0.1:8001",
+    "datasets": {
+      "kinetics_400": {
+        "perturbation_type": "adversarial_attack",
+        "severity": 1,
+        "video_directory": "dataprocess/videos"
+      }
+    }
+  },
+  "model_config": {
+    "base_urls": [
+      "http://127.0.0.1:8002",
+      "http://127.0.0.1:8005"
+    ],
+    "models": {
+      "kinetics_video": {
+        "model_name": "facebook/timesformer-base-finetuned-k400",
+        "original_video_dir": "dataprocess/videos",
+        "adversarial_video_dir": "dataprocess/FGSM",
+        "num_frames": 8
+      }
+    }
+  },
+  "xai_config": {
+    "base_url": "http://127.0.0.1:8003",
+    "datasets": {
+      "kinetics_video": {
+        "video_path": "dataprocess/videos",
+        "adversarial_video_path": "dataprocess/FGSM",
+        "num_frames": 8
+      }
+    }
+  }
+}
 
-## Running the System
-
+```
+##  Required Servers to Run the VBAD Pipeline
+Start the following services before executing the pipeline:
+```
+python dataprocess/dataprocess_server.py
+python modelserver_untargeted/model_server.py
+python modelserver_targeted/model_server.py
+python untargeted/untargeted_server.py
+python targeted/targeted_server.py
+python xaiserver/xai_server.py
+python center_server.py
+```
+## For FGSM Pipeline 
+```
+python dataprocess/dataprocess_server.py
+python modelserver/model_server.py
+python modelserver_adversarial/model_server.py
+python xaiserver/xai_server.py
+python center_server.py
+```
 ### Starting the Service
 
-Run the FastAPI application using Uvicorn as an ASGI server with the following command:
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
 ### Using the API
-
-The system provides several RESTful APIs to support operations such as data upload, model prediction, XAI method execution, and evaluation tasks. Here are some examples of how to use these APIs:
-
-- **Upload Dataset**:
-
-  ```bash
-  curl -X POST "http://localhost:8000/upload-dataset/dataset1" -F "file=@/path/to/dataset.zip"
-  ```
 
 - **Execute XAI Task**:
 
   ```bash
-  curl -X POST "http://localhost:8000/cam_xai" -H "Content-Type: application/json" -d '{"dataset_id": "dataset1", "algorithms": ["GradCAM", "SmoothGrad"]}'
+  curl -X POST "http://127.0.0.1:8880/run_pipeline/" \
+  -H "Content-Type: application/json" \
+  --data-binary "@task_sheets/task.json"
   ```
 
-## Maintenance and Monitoring
-
-### Logging
-
-Configure appropriate logging policies to record key operations and errors within the system. This can be achieved by setting up Python's logging module to handle different log levels and outputs.
-
-### Performance Monitoring
-
-It is recommended to use monitoring tools like Prometheus and Grafana to track system performance and health indicators.
-
-## Frequently Asked Questions (FAQ)
-
-### How do I handle data upload failures?
-
-Check if the target server is reachable and ensure that the file paths in the configuration file are correctly specified.
-
-### How do I update API endpoints in the configuration file?
-
-Modify the API endpoints directly in the JSON configuration file and restart the service to apply changes.
-
+##  Outputs (videos, attention values) will be stored in the `output/` directory. 

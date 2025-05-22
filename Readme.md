@@ -1,14 +1,63 @@
 
-# XAIport
+# VideoXAI
 
 ## Overview
 
-XAIport is designed to deliver interpretable AI model predictions through a microservice architecture, allowing users to understand the underlying decision-making processes of AI models better. The architecture includes a User Interface, Coordination Center, Core Microservices such as Data Processing, AI Model, XAI Method, and Evaluation Services, along with a Data Persistence layer.
+**VideoXAI** is an end-to-end explainable AI pipeline for video classification, built as an extension to [XAIport](https://github.com/ZeruiW/XAIport) framework. While XAIport was designed for static data like images and tabular inputs, VideoXAI expands it to support dynamic video content through transformer-based modeling, adversarial robustness analysis, spatio-temporal attention attribution, and natural language querying.
 
+This system combines clean architecture with interpretability and robustness evaluation. It processes video inputs, injects adversarial perturbations, performs classification with attention extraction, and enables semantic retrieval using Retrieval-Augmented Generation (RAG) based on stored attention data.
 
-![Architecture Diagram](assets/architecture_diagram.webp)
+---
 
+### 📌 Key Features
 
+- **Full Video Explainability Pipeline**: From raw input to interpretable output.
+- **Attack Injection**: Supports FGSM and VBAD (both targeted and untargeted) attacks to evaluate model vulnerabilities.
+- **Transformer-Based Modeling**: Uses models like TimeSformer to extract spatial and temporal attention maps from videos.
+- **Spatio-Temporal Attention Attribution (STAA)**: Computes fine-grained attention visualizations over space and time using internal transformer attention layers.
+- **Provenance and Vector Indexing**: Stores frame-level attention embeddings in Pinecone, indexed by attack type and model version.
+- **RAG-based Query System**: Enables natural language querying of model behavior using LLaMA 3.2 via Ollama.
+- **Scalable & Reproducible**: Designed to run on Concordia University's HPC cluster for reproducible research.
+
+---
+
+### 🧱 System Architecture
+
+The VideoXAI architecture is composed of the following modular microservices:
+
+- `Data Processing`: Frame extraction and adversarial perturbation.
+- `Model Inference`: Patch projection, classification, and attention extraction using vision transformers.
+- `XAI Service (STAA)`: Attribution of spatial and temporal importance using multi-head attention layers.
+- `Provenance & RAG`: Vector storage in Pinecone and semantic retrieval via LLaMA-based RAG.
+- `Coordinator`: Manages data flow and orchestration between services.
+
+---
+
+### 📊 Architecture Diagram
+
+![VideoXAI Pipeline](assets/videoxai_pipeline.png)
+
+---
+
+### 🗂️ Technologies Used
+
+- Python, PyTorch, Transformers (TimeSformer)
+- Pinecone Vector Database
+- Ollama + LLaMA 3.2
+- FGSM, VBAD (I3D-based) Attacks
+- HPC execution on Concordia Speed Cluster
+- Draw.io for architecture design
+
+---
+
+### 🔍 Use Cases
+
+- Analyze and visualize model decisions on video data.
+- Evaluate model robustness under adversarial attacks.
+- Retrieve and compare attention explanations via natural language queries.
+- Extend to other video-based tasks requiring interpretability.
+
+---
 
 ## Initial Setup
 
@@ -180,3 +229,19 @@ All processed outputs will be stored in:
 These include video frames, attention values, and model predictions.
 
 Note: During the VBAD pipeline, ensure that the video you are processing has the exact corresponding label number listed in the kinetics400_val_list_videos.txt file located inside the untargeted/ directory.
+
+
+
+
+### 📖 Citation
+
+If you use this project in your research, please cite:
+
+```bibtex
+@misc{videoxai2025,
+  author       = {Kondal, Abideep Singh}{Singh, Ravinder},
+  title        = {VideoXAI: An Explainable AI Pipeline for Robust Video Classification},
+  year         = {2025},
+  note         = {Extension of XAIport Framework},
+  url          = {https://github.com/DeepKondal/VideoXAI}
+}

@@ -45,9 +45,7 @@ The VideoXAI architecture is composed of the following modular microservices:
 - Pinecone Vector Database
 - Ollama + LLaMA 3.2
 - FGSM, VBAD (I3D-based) Attacks
-- HPC execution on Concordia Speed Cluster
-- Draw.io for architecture design
-
+  
 ---
 
 ### 🔍 Use Cases

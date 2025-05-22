@@ -35,7 +35,7 @@ The VideoXAI architecture is composed of the following modular microservices:
 
 ### 📊 Architecture Diagram
 
-![VideoXAI Pipeline](assets/videoxai_pipeline.png)
+![VideoXAI Pipeline](assets/videoxai_diagram.png)
 
 ---
 

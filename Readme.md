@@ -9,7 +9,7 @@ This system combines clean architecture with interpretability and robustness eva
 
 ---
 
-### 📌 Key Features
+### Key Features
 
 - **Full Video Explainability Pipeline**: From raw input to interpretable output.
 - **Attack Injection**: Supports FGSM and VBAD (both targeted and untargeted) attacks to evaluate model vulnerabilities.
@@ -21,7 +21,7 @@ This system combines clean architecture with interpretability and robustness eva
 
 ---
 
-### 🧱 System Architecture
+### System Architecture
 
 The VideoXAI architecture is composed of the following modular microservices:
 
@@ -33,13 +33,13 @@ The VideoXAI architecture is composed of the following modular microservices:
 
 ---
 
-### 📊 Architecture Diagram
+### Architecture Diagram
 
 ![VideoXAI Pipeline](assets/videoxai_diagram.png)
 
 ---
 
-### 🗂️ Technologies Used
+### Technologies Used
 
 - Python, PyTorch, Transformers (TimeSformer)
 - Pinecone Vector Database
@@ -48,7 +48,7 @@ The VideoXAI architecture is composed of the following modular microservices:
   
 ---
 
-### 🔍 Use Cases
+### Use Cases
 
 - Analyze and visualize model decisions on video data.
 - Evaluate model robustness under adversarial attacks.

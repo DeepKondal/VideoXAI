@@ -232,7 +232,8 @@ Note: During the VBAD pipeline, ensure that the video you are processing has the
 VideoXAI is designed to be deployable not only as a local microservice pipeline but also as a batch job on HPC systems (e.g., Concordia’s Speed cluster). This enables efficient large-scale video explainability workflows in research environments.
 
 The SLURM job script is also included in this repository as: `HPC_script_VideoXai.txt`
-You can directly download and submit the job using: sbatch HPC_script_VideoXai.txt
+You can directly download and submit the job using: `sbatch HPC_script_VideoXai.txt`
+NOTE: Before running the script make sure your script confirguration matches your HPC standards. Read the documentation of your HPC before submitting the job.
 
 ### 📖 Citation
 

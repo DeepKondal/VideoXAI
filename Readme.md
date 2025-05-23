@@ -228,8 +228,11 @@ These include video frames, attention values, and model predictions.
 
 Note: During the VBAD pipeline, ensure that the video you are processing has the exact corresponding label number listed in the kinetics400_val_list_videos.txt file located inside the untargeted/ directory.
 
+### Running on HPC Cluster (SLURM-based)
+VideoXAI is designed to be deployable not only as a local microservice pipeline but also as a batch job on HPC systems (e.g., Concordia’s Speed cluster). This enables efficient large-scale video explainability workflows in research environments.
 
-
+The SLURM job script is also included in this repository as: `HPC_script_VideoXai.txt`
+You can directly download and submit the job using: sbatch HPC_script_VideoXai.txt
 
 ### 📖 Citation
 

@@ -17,7 +17,7 @@ This system combines clean architecture with interpretability and robustness eva
 - **Spatio-Temporal Attention Attribution (STAA)**: Computes fine-grained attention visualizations over space and time using internal transformer attention layers.
 - **Provenance and Vector Indexing**: Stores frame-level attention embeddings in Pinecone, indexed by attack type and model version.
 - **RAG-based Query System**: Enables natural language querying of model behavior using LLaMA 3.2 via Ollama.
-- **Scalable & Reproducible**: Designed to run on Concordia University's HPC cluster for reproducible research.
+- **Scalable & Reproducible**: The system is designed to operate flexibly in both environments—locally as a modular microservice-based architecture, and at scale via job submission on a HPC cluster, ensuring reproducibility and performance under varied deployment settings.
 
 ---
 
